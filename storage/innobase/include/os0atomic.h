@@ -33,6 +33,7 @@ Created 2012-09-23 Sunny Bains (Split from os0sync.h)
 #define os0atomic_h
 
 #include "univ.i"
+#include <my_atomic.h>
 
 #ifdef _WIN32
 
@@ -164,12 +165,6 @@ amount of increment. */
 		static_cast<lint>(amount)))			\
 	+ static_cast<ulint>(amount))
 
-# define os_atomic_increment_uint32(ptr, amount)		\
-	(static_cast<ulint>(InterlockedExchangeAdd(		\
-		reinterpret_cast<long*>(ptr),			\
-		static_cast<long>(amount)))			\
-	+ static_cast<ulint>(amount))
-
 # define os_atomic_increment_uint64(ptr, amount)		\
 	(static_cast<ib_uint64_t>(InterlockedExchangeAdd64(	\
 		reinterpret_cast<LONGLONG*>(ptr),		\
@@ -188,12 +183,6 @@ amount to decrement. There is no atomic substract function on Windows */
 		reinterpret_cast<volatile lint*>(ptr),		\
 		-(static_cast<lint>(amount))))			\
 	- static_cast<ulint>(amount))
-
-# define os_atomic_decrement_uint32(ptr, amount)		\
-	(static_cast<ib_uint32_t>(InterlockedExchangeAdd(	\
-		reinterpret_cast<long*>(ptr),			\
-		-(static_cast<long>(amount))))			\
-	- static_cast<ib_uint32_t>(amount))
 
 # define os_atomic_decrement_uint64(ptr, amount)		\
 	(static_cast<ib_uint64_t>(InterlockedExchangeAdd64(	\
@@ -311,9 +300,6 @@ amount of increment. */
 # define os_atomic_increment_ulint(ptr, amount) \
 	os_atomic_increment(ptr, amount)
 
-# define os_atomic_increment_uint32(ptr, amount ) \
-	os_atomic_increment(ptr, amount)
-
 # define os_atomic_increment_uint64(ptr, amount) \
 	os_atomic_increment(ptr, amount)
 
@@ -337,9 +323,6 @@ amount to decrement. */
 	os_atomic_decrement(ptr, amount)
 
 # define os_atomic_decrement_ulint(ptr, amount) \
-	os_atomic_decrement(ptr, amount)
-
-# define os_atomic_decrement_uint32(ptr, amount) \
 	os_atomic_decrement(ptr, amount)
 
 # define os_atomic_decrement_uint64(ptr, amount) \
