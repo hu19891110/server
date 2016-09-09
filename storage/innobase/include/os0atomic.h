@@ -141,9 +141,6 @@ compare to, new_val is the value to swap in. */
 # define os_compare_and_swap_ulint(ptr, old_val, new_val) \
 	(win_cmp_and_xchg_ulint(ptr, new_val, old_val) == old_val)
 
-# define os_compare_and_swap_uint32(ptr, old_val, new_val) \
-	(InterlockedCompareExchange(ptr, new_val, old_val) == old_val)
-
 /* windows thread objects can always be passed to windows atomic functions */
 # define os_compare_and_swap_thread_id(ptr, old_val, new_val) \
 	(win_cmp_and_xchg_dword(ptr, new_val, old_val) == old_val)
@@ -196,9 +193,6 @@ compare to, new_val is the value to swap in. */
 # define os_compare_and_swap_lint(ptr, old_val, new_val) \
 	os_compare_and_swap(ptr, old_val, new_val)
 
-# define os_compare_and_swap_uint32(ptr, old_val, new_val) \
-	os_compare_and_swap(ptr, old_val, new_val)
-
 #else
 
 UNIV_INLINE
@@ -220,18 +214,6 @@ os_compare_and_swap_lint(volatile lint* ptr, lint old_val, lint new_val)
 #ifdef HAVE_IB_GCC_ATOMIC_SEQ_CST
 	return __atomic_compare_exchange_n(ptr, &old_val, new_val, 0,
 				     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-#else
-	return __sync_bool_compare_and_swap(ptr, old_val, new_val);
-#endif
-}
-
-UNIV_INLINE
-bool
-os_compare_and_swap_uint32(volatile ib_uint32_t* ptr, ib_uint32_t old_val, ib_uint32_t new_val)
-{
-#ifdef HAVE_IB_GCC_ATOMIC_SEQ_CST
-	return __atomic_compare_exchange_n(ptr, &old_val, new_val, 0,
-			__ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 #else
 	return __sync_bool_compare_and_swap(ptr, old_val, new_val);
 #endif
