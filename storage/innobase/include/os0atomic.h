@@ -165,12 +165,6 @@ amount of increment. */
 		static_cast<lint>(amount)))			\
 	+ static_cast<ulint>(amount))
 
-# define os_atomic_increment_uint64(ptr, amount)		\
-	(static_cast<ib_uint64_t>(InterlockedExchangeAdd64(	\
-		reinterpret_cast<LONGLONG*>(ptr),		\
-		static_cast<LONGLONG>(amount)))			\
-	+ static_cast<ib_uint64_t>(amount))
-
 /**********************************************************//**
 Returns the resulting value, ptr is pointer to target, amount is the
 amount to decrement. There is no atomic substract function on Windows */
@@ -183,12 +177,6 @@ amount to decrement. There is no atomic substract function on Windows */
 		reinterpret_cast<volatile lint*>(ptr),		\
 		-(static_cast<lint>(amount))))			\
 	- static_cast<ulint>(amount))
-
-# define os_atomic_decrement_uint64(ptr, amount)		\
-	(static_cast<ib_uint64_t>(InterlockedExchangeAdd64(	\
-		reinterpret_cast<LONGLONG*>(ptr),		\
-		-(static_cast<LONGLONG>(amount))))		\
-	- static_cast<ib_uint64_t>(amount))
 
 #else
 /* Fall back to GCC-style atomic builtins. */
@@ -300,9 +288,6 @@ amount of increment. */
 # define os_atomic_increment_ulint(ptr, amount) \
 	os_atomic_increment(ptr, amount)
 
-# define os_atomic_increment_uint64(ptr, amount) \
-	os_atomic_increment(ptr, amount)
-
 /* Returns the resulting value, ptr is pointer to target, amount is the
 amount to decrement. */
 
@@ -323,9 +308,6 @@ amount to decrement. */
 	os_atomic_decrement(ptr, amount)
 
 # define os_atomic_decrement_ulint(ptr, amount) \
-	os_atomic_decrement(ptr, amount)
-
-# define os_atomic_decrement_uint64(ptr, amount) \
 	os_atomic_decrement(ptr, amount)
 
 #endif
