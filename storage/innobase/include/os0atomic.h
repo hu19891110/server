@@ -98,16 +98,6 @@ win_cmp_and_xchg_lint(
 	lint		old_val);	/*!< in: value to compare to */
 
 /**********************************************************//**
-Atomic addition of signed integers.
-@return Initial value of the variable pointed to by ptr */
-UNIV_INLINE
-lint
-win_xchg_and_add(
-/*=============*/
-	volatile lint*	ptr,	/*!< in/out: address of destination */
-	lint		val);	/*!< in: number to be added */
-
-/**********************************************************//**
 Atomic compare and exchange of unsigned integers.
 @return value found before the exchange.
 If it is not equal to old_value the exchange did not happen. */
@@ -148,26 +138,6 @@ compare to, new_val is the value to swap in. */
 # define INNODB_RW_LOCKS_USE_ATOMICS
 # define IB_ATOMICS_STARTUP_MSG \
 	"Mutexes and rw_locks use Windows interlocked functions"
-
-/**********************************************************//**
-Returns the resulting value, ptr is pointer to target, amount is the
-amount of increment. */
-
-# define os_atomic_increment_ulint(ptr, amount)			\
-	(static_cast<ulint>(win_xchg_and_add(			\
-		reinterpret_cast<volatile lint*>(ptr),		\
-		static_cast<lint>(amount)))			\
-	+ static_cast<ulint>(amount))
-
-/**********************************************************//**
-Returns the resulting value, ptr is pointer to target, amount is the
-amount to decrement. There is no atomic substract function on Windows */
-
-# define os_atomic_decrement_ulint(ptr, amount)			\
-	(static_cast<ulint>(win_xchg_and_add(			\
-		reinterpret_cast<volatile lint*>(ptr),		\
-		-(static_cast<lint>(amount))))			\
-	- static_cast<ulint>(amount))
 
 #else
 /* Fall back to GCC-style atomic builtins. */
@@ -240,50 +210,8 @@ os_compare_and_swap_thread_id(volatile os_thread_id_t* ptr, os_thread_id_t old_v
 	"Mutexes use GCC atomic builtins, rw_locks do not"
 # endif /* HAVE_IB_ATOMIC_PTHREAD_T_GCC */
 
-/**********************************************************//**
-Returns the resulting value, ptr is pointer to target, amount is the
-amount of increment. */
-
-#if defined(HAVE_GCC_SYNC_BUILTINS)
-# define os_atomic_increment(ptr, amount) \
-	__sync_add_and_fetch(ptr, amount)
-#else
-#ifdef HAVE_IB_GCC_ATOMIC_SEQ_CST
-# define os_atomic_increment(ptr, amount) \
-	__atomic_add_fetch(ptr, amount, __ATOMIC_SEQ_CST)
-#else
-# define os_atomic_increment(ptr, amount) \
-	__sync_add_and_fetch(ptr, amount)
 #endif
 
-#endif /* HAVE_GCC_SYNC_BUILTINS */
-
-# define os_atomic_increment_ulint(ptr, amount) \
-	os_atomic_increment(ptr, amount)
-
-/* Returns the resulting value, ptr is pointer to target, amount is the
-amount to decrement. */
-
-#if defined(HAVE_GCC_SYNC_BUILTINS)
-# define os_atomic_decrement(ptr, amount) \
-	__sync_sub_and_fetch(ptr, amount)
-#else
-#ifdef HAVE_IB_GCC_ATOMIC_SEQ_CST
-# define os_atomic_decrement(ptr, amount) \
-	__atomic_sub_fetch(ptr, amount, __ATOMIC_SEQ_CST)
-#else
-# define os_atomic_decrement(ptr, amount) \
-	__sync_sub_and_fetch(ptr, amount)
-#endif
-#endif /* HAVE_GCC_SYNC_BUILTINS */
-
-# define os_atomic_decrement_ulint(ptr, amount) \
-	os_atomic_decrement(ptr, amount)
-
-#endif
-
-#define os_atomic_inc_ulint(m,v,d)	os_atomic_increment_ulint(v, d)
-#define os_atomic_dec_ulint(m,v,d)	os_atomic_decrement_ulint(v, d)
 #define TAS(l, n)			os_atomic_test_and_set((l), (n))
 #define CAS(l, o, n)		os_atomic_val_compare_and_swap((l), (o), (n))
 

@@ -372,7 +372,7 @@ trx_purge_add_update_undo_to_history(
 		       undo_header + TRX_UNDO_HISTORY_NODE, mtr);
 
 	if (update_rseg_history_len) {
-		os_atomic_increment_ulint(
+		my_atomic_addlong(
 			&trx_sys->rseg_history_len, n_added_logs);
 		srv_wake_purge_thread_if_not_active();
 	}
@@ -476,7 +476,7 @@ trx_purge_free_segment(
 	flst_cut_end(rseg_hdr + TRX_RSEG_HISTORY,
 		     log_hdr + TRX_UNDO_HISTORY_NODE, n_removed_logs, &mtr);
 
-	os_atomic_decrement_ulint(&trx_sys->rseg_history_len, n_removed_logs);
+	my_atomic_addlong(&trx_sys->rseg_history_len, -n_removed_logs);
 
 	do {
 
@@ -565,8 +565,8 @@ loop:
 				hdr_addr.boffset, limit->undo_no);
 		}
 
-		os_atomic_decrement_ulint(
-			&trx_sys->rseg_history_len, n_removed_logs);
+		my_atomic_addlong(
+			&trx_sys->rseg_history_len, -n_removed_logs);
 
 		flst_truncate_end(rseg_hdr + TRX_RSEG_HISTORY,
 				  log_hdr + TRX_UNDO_HISTORY_NODE,
@@ -1859,8 +1859,8 @@ run_synchronously:
 
 		que_run_threads(thr);
 
-		os_atomic_inc_ulint(
-			&purge_sys->pq_mutex, &purge_sys->n_completed, 1);
+		my_atomic_addlong(
+			&purge_sys->n_completed, 1);
 
 		if (n_purge_threads > 1) {
 			trx_purge_wait_for_workers_to_complete(purge_sys);

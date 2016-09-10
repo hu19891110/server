@@ -51,23 +51,6 @@ win_cmp_and_xchg_lint(
 }
 
 /**********************************************************//**
-Atomic addition of signed integers.
-@return Initial value of the variable pointed to by ptr */
-UNIV_INLINE
-lint
-win_xchg_and_add(
-/*=============*/
-	volatile lint*	ptr,	/*!< in/out: address of destination */
-	lint		val)	/*!< in: number to be added */
-{
-#ifdef _WIN64
-	return(InterlockedExchangeAdd64(ptr, val));
-#else
-	return(InterlockedExchangeAdd(ptr, val));
-#endif /* _WIN64 */
-}
-
-/**********************************************************//**
 Atomic compare and exchange of unsigned integers.
 @return value found before the exchange.
 If it is not equal to old_value the exchange did not happen. */

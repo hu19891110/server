@@ -282,8 +282,10 @@ make_atomic_store(ptr)
 
 #if SIZEOF_LONG == 4
 #define my_atomic_addlong(A,B) my_atomic_add32((int32*) (A), (B))
+#define my_atomic_loadlong(A) my_atomic_load32((int32*) (A))
 #else
 #define my_atomic_addlong(A,B) my_atomic_add64((int64*) (A), (B))
+#define my_atomic_loadlong(A) my_atomic_load64((int64*) (A))
 #endif
 
 #ifdef _atomic_h_cleanup_

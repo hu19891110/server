@@ -187,12 +187,6 @@ IF(NOT MSVC)
     if (res || x != 10) {
       return(1);
     }
-    x = 10;
-    y = 123;
-    res = __sync_add_and_fetch(&x, y);
-    if (res != 123 + 10 || x != 123 + 10) {
-      return(1);
-    }
     return(0);
   }"
   HAVE_IB_GCC_ATOMIC_BUILTINS
@@ -212,26 +206,6 @@ IF(NOT MSVC)
     return(0);
   }"
   HAVE_IB_GCC_ATOMIC_BUILTINS_BYTE
-  )
-  CHECK_C_SOURCE(
-  "#include<stdint.h>
-  int main()
-  {
-    int64_t	x,y,res;
-
-    x = 10;
-    y = 123;
-    res = __sync_sub_and_fetch(&y, x);
-    if (res != y || y != 113) {
-      return(1);
-    }
-    res = __sync_add_and_fetch(&y, x);
-    if (res != y || y != 123) {
-      return(1);
-    }
-    return(0);
-  }"
-  HAVE_IB_GCC_ATOMIC_BUILTINS_64
   )
   CHECK_C_SOURCE(
   "#include<stdint.h>
@@ -304,10 +278,6 @@ ENDIF()
 
 IF(HAVE_IB_GCC_ATOMIC_BUILTINS_BYTE)
  ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_BUILTINS_BYTE=1)
-ENDIF()
-
-IF(HAVE_IB_GCC_ATOMIC_BUILTINS_64)
- ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_BUILTINS_64=1)
 ENDIF()
 
 IF(HAVE_IB_GCC_SYNC_SYNCHRONISE)
