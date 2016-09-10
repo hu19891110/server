@@ -158,39 +158,12 @@ IF(HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE)
 ENDIF()
 
 IF(NOT MSVC)
-# either define HAVE_IB_GCC_ATOMIC_BUILTINS or not
-  # either define HAVE_IB_GCC_ATOMIC_BUILTINS or not
   # workaround for gcc 4.1.2 RHEL5/x86, gcc atomic ops only work under -march=i686
   IF(CMAKE_SYSTEM_PROCESSOR STREQUAL "i686" AND CMAKE_COMPILER_IS_GNUCC AND
      CMAKE_C_COMPILER_VERSION VERSION_LESS "4.1.3")
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
   ENDIF()
-  CHECK_C_SOURCE(
-  "
-  int main()
-  {
-    long	x;
-    long	y;
-    long	res;
-
-    x = 10;
-    y = 123;
-    res = __sync_bool_compare_and_swap(&x, x, y);
-    if (!res || x != y) {
-      return(1);
-    }
-
-    x = 10;
-    y = 123;
-    res = __sync_bool_compare_and_swap(&x, x + 1, y);
-    if (res || x != 10) {
-      return(1);
-    }
-    return(0);
-  }"
-  HAVE_IB_GCC_ATOMIC_BUILTINS
-  )
   CHECK_C_SOURCE(
   "#include<stdint.h>
   int main()
@@ -210,28 +183,6 @@ IF(NOT MSVC)
   }"
   HAVE_IB_GCC_ATOMIC_THREAD_FENCE
   )
-CHECK_C_SOURCE_RUNS(
-  "#include<stdint.h>
-  int main()
-  {
-    unsigned char	a = 0;
-    unsigned char	b = 0;
-    unsigned char	c = 1;
-
-    __atomic_compare_exchange_n(&a, &b, &c, 0,
-			      __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-    return (0);
-  }"
-  HAVE_IB_GCC_ATOMIC_SEQ_CST
-  )
-
-IF (HAVE_IB_GCC_ATOMIC_SEQ_CST)
-  ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_CST=1)
-ENDIF()
-
-IF(HAVE_IB_GCC_ATOMIC_BUILTINS)
- ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_BUILTINS=1)
-ENDIF()
 
 IF(HAVE_IB_GCC_SYNC_SYNCHRONISE)
  ADD_DEFINITIONS(-DHAVE_IB_GCC_SYNC_SYNCHRONISE=1)
@@ -239,33 +190,6 @@ ENDIF()
 
 IF(HAVE_IB_GCC_ATOMIC_THREAD_FENCE)
  ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_THREAD_FENCE=1)
-ENDIF()
-
- # either define HAVE_IB_ATOMIC_PTHREAD_T_GCC or not
-IF(NOT CMAKE_CROSSCOMPILING)
-  CHECK_C_SOURCE_RUNS(
-  "
-  #include <pthread.h>
-  #include <string.h>
-
-  int main() {
-    pthread_t       x1;
-    pthread_t       x2;
-    pthread_t       x3;
-
-    memset(&x1, 0x0, sizeof(x1));
-    memset(&x2, 0x0, sizeof(x2));
-    memset(&x3, 0x0, sizeof(x3));
-
-    __sync_bool_compare_and_swap(&x1, x2, x3);
-
-    return(0);
-  }"
-  HAVE_IB_ATOMIC_PTHREAD_T_GCC)
-ENDIF()
-
-IF(HAVE_IB_ATOMIC_PTHREAD_T_GCC)
-  ADD_DEFINITIONS(-DHAVE_IB_ATOMIC_PTHREAD_T_GCC=1)
 ENDIF()
 
 # Only use futexes on Linux if GCC atomics are available

@@ -35,6 +35,8 @@ Created 2012-09-23 Sunny Bains (Split from os0sync.h)
 #include "univ.i"
 #include <my_atomic.h>
 
+# define INNODB_RW_LOCKS_USE_ATOMICS
+
 #ifdef _WIN32
 
 /** On Windows, InterlockedExchange operates on LONG variable */
@@ -68,37 +70,20 @@ win_cmp_and_xchg_dword(
 # define os_compare_and_swap_thread_id(ptr, old_val, new_val) \
 	(win_cmp_and_xchg_dword(ptr, new_val, old_val) == old_val)
 
-# define INNODB_RW_LOCKS_USE_ATOMICS
 # define IB_ATOMICS_STARTUP_MSG \
 	"Mutexes and rw_locks use Windows interlocked functions"
 
 #else
 /* Fall back to GCC-style atomic builtins. */
 
-# ifdef HAVE_IB_ATOMIC_PTHREAD_T_GCC
-#if defined(HAVE_GCC_SYNC_BUILTINS)
-#  define os_compare_and_swap_thread_id(ptr, old_val, new_val) \
-	os_compare_and_swap(ptr, old_val, new_val)
-#else
 UNIV_INLINE
 bool
 os_compare_and_swap_thread_id(volatile os_thread_id_t* ptr, os_thread_id_t old_val, os_thread_id_t new_val)
 {
-#ifdef HAVE_IB_GCC_ATOMIC_SEQ_CST
-	return __atomic_compare_exchange_n(ptr, &old_val, new_val, 0,
-			__ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-#else
 	return __sync_bool_compare_and_swap(ptr, old_val, new_val);
-#endif
 }
-#endif /* HAVE_GCC_SYNC_BUILTINS */
-#  define INNODB_RW_LOCKS_USE_ATOMICS
 #  define IB_ATOMICS_STARTUP_MSG \
 	"Mutexes and rw_locks use GCC atomic builtins"
-# else /* HAVE_IB_ATOMIC_PTHREAD_T_GCC */
-#  define IB_ATOMICS_STARTUP_MSG \
-	"Mutexes use GCC atomic builtins, rw_locks do not"
-# endif /* HAVE_IB_ATOMIC_PTHREAD_T_GCC */
 
 #endif
 
