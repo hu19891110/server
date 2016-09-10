@@ -243,53 +243,6 @@ ENDIF()
 
 # Solaris atomics
 IF(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
-  CHECK_FUNCTION_EXISTS(atomic_cas_ulong  HAVE_ATOMIC_CAS_ULONG)
-  CHECK_FUNCTION_EXISTS(atomic_cas_32 HAVE_ATOMIC_CAS_32)
-  CHECK_FUNCTION_EXISTS(atomic_cas_64 HAVE_ATOMIC_CAS_64)
-  CHECK_FUNCTION_EXISTS(atomic_add_long_nv HAVE_ATOMIC_ADD_LONG_NV)
-  CHECK_FUNCTION_EXISTS(atomic_swap_uchar HAVE_ATOMIC_SWAP_UCHAR)
-  IF(HAVE_ATOMIC_CAS_ULONG AND
-     HAVE_ATOMIC_CAS_32 AND
-     HAVE_ATOMIC_CAS_64 AND
-     HAVE_ATOMIC_ADD_LONG_NV AND
-     HAVE_ATOMIC_SWAP_UCHAR)
-    SET(HAVE_IB_SOLARIS_ATOMICS 1)
-  ENDIF()
-
-  IF(HAVE_IB_SOLARIS_ATOMICS)
-    ADD_DEFINITIONS(-DHAVE_IB_SOLARIS_ATOMICS=1)
-  ENDIF()
-
-  # either define HAVE_IB_ATOMIC_PTHREAD_T_SOLARIS or not
-  CHECK_C_SOURCE_COMPILES(
-  "   #include <pthread.h>
-      #include <string.h>
-
-      int main(int argc, char** argv) {
-        pthread_t       x1;
-        pthread_t       x2;
-        pthread_t       x3;
-
-        memset(&x1, 0x0, sizeof(x1));
-        memset(&x2, 0x0, sizeof(x2));
-        memset(&x3, 0x0, sizeof(x3));
-
-        if (sizeof(pthread_t) == 4) {
-
-          atomic_cas_32(&x1, x2, x3);
-
-        } else if (sizeof(pthread_t) == 8) {
-
-          atomic_cas_64(&x1, x2, x3);
-
-        } else {
-
-          return(1);
-        }
-
-      return(0);
-    }
-  " HAVE_IB_ATOMIC_PTHREAD_T_SOLARIS)
   CHECK_C_SOURCE_COMPILES(
   "#include <mbarrier.h>
   int main() {
@@ -299,9 +252,6 @@ IF(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
   }"
   HAVE_IB_MACHINE_BARRIER_SOLARIS)
 
-  IF(HAVE_IB_ATOMIC_PTHREAD_T_SOLARIS)
-    ADD_DEFINITIONS(-DHAVE_IB_ATOMIC_PTHREAD_T_SOLARIS=1)
-  ENDIF()
   IF(HAVE_IB_MACHINE_BARRIER_SOLARIS)
     ADD_DEFINITIONS(-DHAVE_IB_MACHINE_BARRIER_SOLARIS=1)
   ENDIF()
