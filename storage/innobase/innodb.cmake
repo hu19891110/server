@@ -210,32 +210,6 @@ IF(NOT MSVC)
   }"
   HAVE_IB_GCC_ATOMIC_THREAD_FENCE
   )
-  CHECK_C_SOURCE(
-  "#include<stdint.h>
-  int main()
-  {
-    unsigned char	c;
-
-    __atomic_test_and_set(&c, __ATOMIC_ACQUIRE);
-    __atomic_clear(&c, __ATOMIC_RELEASE);
-    return(0);
-  }"
-  HAVE_IB_GCC_ATOMIC_TEST_AND_SET
-  )
-  CHECK_C_SOURCE_RUNS(
-  "#include<stdint.h>
-  int main()
-  {
-    unsigned char	a = 0;
-    unsigned char	b = 0;
-    unsigned char	c = 1;
-
-    __atomic_compare_exchange(&a, &b, &c, 0,
-			      __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
-    return(0);
-  }"
-  HAVE_IB_GCC_ATOMIC_COMPARE_EXCHANGE
-  )
 CHECK_C_SOURCE_RUNS(
   "#include<stdint.h>
   int main()
@@ -265,14 +239,6 @@ ENDIF()
 
 IF(HAVE_IB_GCC_ATOMIC_THREAD_FENCE)
  ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_THREAD_FENCE=1)
-ENDIF()
-
-IF(HAVE_IB_GCC_ATOMIC_TEST_AND_SET)
- ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_TEST_AND_SET=1)
-ENDIF()
-
-IF(HAVE_IB_GCC_ATOMIC_COMPARE_EXCHANGE)
- ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_COMPARE_EXCHANGE=1)
 ENDIF()
 
  # either define HAVE_IB_ATOMIC_PTHREAD_T_GCC or not

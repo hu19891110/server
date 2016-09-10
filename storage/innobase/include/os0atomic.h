@@ -50,53 +50,7 @@ typedef ulint	lock_word_t;
 
 #endif /* _WIN32 */
 
-#if defined __i386__ || defined __x86_64__ || defined _M_IX86 \
-    || defined _M_X64 || defined __WIN__
-
-#define IB_STRONG_MEMORY_MODEL
-
-#endif /* __i386__ || __x86_64__ || _M_IX86 || _M_X64 || __WIN__ */
-
-/**********************************************************//**
-Atomic compare-and-swap and increment for InnoDB. */
-
-/** Do an atomic compare and set
-@param[in/out]	ptr	Memory location to set
-@param[in]	old_val	old value to compare
-@param[in]	new_val	new value to set
-@return the value of ptr before the operation. */
-UNIV_INLINE
-lock_word_t
-os_atomic_val_compare_and_swap(
-	volatile lock_word_t*	ptr,
-	lock_word_t		old_val,
-	lock_word_t		new_val);
-
 #ifdef _WIN32
-
-/**********************************************************//**
-Atomic compare and exchange of signed integers (both 32 and 64 bit).
-@return value found before the exchange.
-If it is not equal to old_value the exchange did not happen. */
-UNIV_INLINE
-lint
-win_cmp_and_xchg_lint(
-/*==================*/
-	volatile lint*	ptr,		/*!< in/out: source/destination */
-	lint		new_val,	/*!< in: exchange value */
-	lint		old_val);	/*!< in: value to compare to */
-
-/**********************************************************//**
-Atomic compare and exchange of unsigned integers.
-@return value found before the exchange.
-If it is not equal to old_value the exchange did not happen. */
-UNIV_INLINE
-ulint
-win_cmp_and_xchg_ulint(
-/*===================*/
-	volatile ulint*	ptr,		/*!< in/out: source/destination */
-	ulint		new_val,	/*!< in: exchange value */
-	ulint		old_val);	/*!< in: value to compare to */
 
 /**********************************************************//**
 Atomic compare and exchange of 32 bit unsigned integers.
@@ -110,16 +64,6 @@ win_cmp_and_xchg_dword(
 	DWORD		new_val,	/*!< in: exchange value */
 	DWORD		old_val);	/*!< in: value to compare to */
 
-/**********************************************************//**
-Returns true if swapped, ptr is pointer to target, old_val is value to
-compare to, new_val is the value to swap in. */
-
-# define os_compare_and_swap_lint(ptr, old_val, new_val) \
-	(win_cmp_and_xchg_lint(ptr, new_val, old_val) == old_val)
-
-# define os_compare_and_swap_ulint(ptr, old_val, new_val) \
-	(win_cmp_and_xchg_ulint(ptr, new_val, old_val) == old_val)
-
 /* windows thread objects can always be passed to windows atomic functions */
 # define os_compare_and_swap_thread_id(ptr, old_val, new_val) \
 	(win_cmp_and_xchg_dword(ptr, new_val, old_val) == old_val)
@@ -130,49 +74,6 @@ compare to, new_val is the value to swap in. */
 
 #else
 /* Fall back to GCC-style atomic builtins. */
-
-/**********************************************************//**
-Returns true if swapped, ptr is pointer to target, old_val is value to
-compare to, new_val is the value to swap in. */
-
-#if defined(HAVE_GCC_SYNC_BUILTINS)
-
-# define os_compare_and_swap(ptr, old_val, new_val) \
-	__sync_bool_compare_and_swap(ptr, old_val, new_val)
-
-# define os_compare_and_swap_ulint(ptr, old_val, new_val) \
-	os_compare_and_swap(ptr, old_val, new_val)
-
-# define os_compare_and_swap_lint(ptr, old_val, new_val) \
-	os_compare_and_swap(ptr, old_val, new_val)
-
-#else
-
-UNIV_INLINE
-bool
-os_compare_and_swap_ulint(volatile ulint* ptr, ulint old_val, ulint new_val)
-{
-#ifdef HAVE_IB_GCC_ATOMIC_SEQ_CST
-	return __atomic_compare_exchange_n(ptr, &old_val, new_val, 0,
-		__ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-#else
-	return __sync_bool_compare_and_swap(ptr, old_val, new_val);
-#endif
-}
-
-UNIV_INLINE
-bool
-os_compare_and_swap_lint(volatile lint* ptr, lint old_val, lint new_val)
-{
-#ifdef HAVE_IB_GCC_ATOMIC_SEQ_CST
-	return __atomic_compare_exchange_n(ptr, &old_val, new_val, 0,
-				     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-#else
-	return __sync_bool_compare_and_swap(ptr, old_val, new_val);
-#endif
-}
-
-#endif /* HAVE_GCC_SYNC_BUILTINS */
 
 # ifdef HAVE_IB_ATOMIC_PTHREAD_T_GCC
 #if defined(HAVE_GCC_SYNC_BUILTINS)
@@ -200,8 +101,6 @@ os_compare_and_swap_thread_id(volatile os_thread_id_t* ptr, os_thread_id_t old_v
 # endif /* HAVE_IB_ATOMIC_PTHREAD_T_GCC */
 
 #endif
-
-#define CAS(l, o, n)		os_atomic_val_compare_and_swap((l), (o), (n))
 
 /** barrier definitions for memory ordering */
 #ifdef HAVE_IB_GCC_ATOMIC_THREAD_FENCE

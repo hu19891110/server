@@ -89,7 +89,8 @@ rw_lock_set_waiter_flag(
 	rw_lock_t*	lock)	/*!< in/out: rw-lock */
 {
 #ifdef INNODB_RW_LOCKS_USE_ATOMICS
-	(void) os_compare_and_swap_ulint(&lock->waiters, 0, 1);
+	ulint oldval= 0;
+	(void) my_atomic_caslong(&lock->waiters, &oldval, 1);
 #else /* INNODB_RW_LOCKS_USE_ATOMICS */
 	lock->waiters = 1;
 	os_wmb;
@@ -107,7 +108,8 @@ rw_lock_reset_waiter_flag(
 	rw_lock_t*	lock)	/*!< in/out: rw-lock */
 {
 #ifdef INNODB_RW_LOCKS_USE_ATOMICS
-	(void) os_compare_and_swap_ulint(&lock->waiters, 1, 0);
+	ulint oldval= 1;
+	(void) my_atomic_caslong(&lock->waiters, &oldval, 0);
 #else /* INNODB_RW_LOCKS_USE_ATOMICS */
 	lock->waiters = 0;
 	os_wmb;
@@ -275,12 +277,11 @@ rw_lock_lock_word_decr(
 	os_rmb;
 	local_lock_word = lock->lock_word;
 	while (local_lock_word > threshold) {
-		if (os_compare_and_swap_lint(&lock->lock_word,
-					     local_lock_word,
-					     local_lock_word - amount)) {
+		if (my_atomic_caslong(&lock->lock_word,
+				      &local_lock_word,
+				      local_lock_word - amount)) {
 			return(true);
 		}
-		local_lock_word = lock->lock_word;
 	}
 	return(false);
 #else /* INNODB_RW_LOCKS_USE_ATOMICS */
@@ -459,7 +460,8 @@ rw_lock_x_lock_func_nowait(
 	ibool local_recursive= lock->recursive;
 
 #ifdef INNODB_RW_LOCKS_USE_ATOMICS
-	success = os_compare_and_swap_lint(&lock->lock_word, X_LOCK_DECR, 0);
+	lint oldval = X_LOCK_DECR;
+	success = my_atomic_caslong(&lock->lock_word, &oldval, 0);
 #else
 
 	success = FALSE;
@@ -473,7 +475,7 @@ rw_lock_x_lock_func_nowait(
 #endif
 	/* Note: recursive must be loaded before writer_thread see
 	comment for rw_lock_set_writer_id_and_recursion_flag().
-	To achieve this we load it before os_compare_and_swap_lint(),
+	To achieve this we load it before my_atomic_caslong(),
 	which implies full memory barrier in current implementation. */
 	if (success) {
 		rw_lock_set_writer_id_and_recursion_flag(lock, true);

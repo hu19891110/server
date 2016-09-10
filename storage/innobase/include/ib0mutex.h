@@ -283,8 +283,10 @@ struct TTASFutexMutex {
 	@return the old state of the mutex */
 	lock_word_t trylock() UNIV_NOTHROW
 	{
-		return(CAS(&m_lock_word,
-			    MUTEX_STATE_UNLOCKED, MUTEX_STATE_LOCKED));
+		lock_word_t oldval = MUTEX_STATE_UNLOCKED;
+		my_atomic_caslong(&m_lock_word,
+				  &oldval, MUTEX_STATE_LOCKED);
+		return(oldval);
 	}
 
 	/** Try and lock the mutex.
@@ -345,9 +347,10 @@ private:
 	@return true if succesful. */
 	bool try_set_waiters() UNIV_NOTHROW
 	{
-		return(CAS(&m_lock_word,
-			   MUTEX_STATE_LOCKED, MUTEX_STATE_WAITERS)
-		       != MUTEX_STATE_UNLOCKED);
+		lock_word_t oldval = MUTEX_STATE_LOCKED;
+		my_atomic_caslong(&m_lock_word,
+				  &oldval, MUTEX_STATE_WAITERS);
+		return(oldval != MUTEX_STATE_UNLOCKED);
 	}
 
 	/** Wait if the lock is contended.

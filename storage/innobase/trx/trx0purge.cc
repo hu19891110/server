@@ -1752,8 +1752,7 @@ trx_purge_wait_for_workers_to_complete(
 	ulint		n_submitted = purge_sys->n_submitted;
 
 	/* Ensure that the work queue empties out. */
-	while (!os_compare_and_swap_ulint(
-			&purge_sys->n_completed, n_submitted, n_submitted)) {
+	while ((ulint) my_atomic_loadlong(&purge_sys->n_completed) != n_submitted) {
 
 		if (srv_get_task_queue_length() > 0) {
 			srv_release_threads(SRV_WORKER, 1);
