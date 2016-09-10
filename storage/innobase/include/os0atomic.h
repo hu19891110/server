@@ -70,9 +70,6 @@ win_cmp_and_xchg_dword(
 # define os_compare_and_swap_thread_id(ptr, old_val, new_val) \
 	(win_cmp_and_xchg_dword(ptr, new_val, old_val) == old_val)
 
-# define IB_ATOMICS_STARTUP_MSG \
-	"Mutexes and rw_locks use Windows interlocked functions"
-
 #else
 /* Fall back to GCC-style atomic builtins. */
 
@@ -82,8 +79,6 @@ os_compare_and_swap_thread_id(volatile os_thread_id_t* ptr, os_thread_id_t old_v
 {
 	return __sync_bool_compare_and_swap(ptr, old_val, new_val);
 }
-#  define IB_ATOMICS_STARTUP_MSG \
-	"Mutexes and rw_locks use GCC atomic builtins"
 
 #endif
 
