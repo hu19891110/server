@@ -915,7 +915,7 @@ os_alloc_block()
 
 		pos = i++ % size;
 
-		if (TAS(&blocks[pos].m_in_use, 1) == 0) {
+		if (my_atomic_faslong(&blocks[pos].m_in_use, 1) == 0) {
 			block = &blocks[pos];
 			break;
 		}
@@ -938,7 +938,7 @@ os_free_block(Block* block)
 {
 	ut_ad(block->m_in_use == 1);
 
-	TAS(&block->m_in_use, 0);
+	my_atomic_storelong(&block->m_in_use, 0);
 
 	/* When this block is not in the block cache, and it's
 	a temporary block, we need to free it directly. */

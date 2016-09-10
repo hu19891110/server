@@ -330,14 +330,14 @@ private:
 	@return the new state of the mutex */
 	lock_word_t unlock() UNIV_NOTHROW
 	{
-		return(TAS(&m_lock_word, MUTEX_STATE_UNLOCKED));
+		return(my_atomic_faslong(&m_lock_word, MUTEX_STATE_UNLOCKED));
 	}
 
 	/** Note that there are threads waiting and need to be woken up.
 	@return true if state was MUTEX_STATE_UNLOCKED (ie. granted) */
 	bool set_waiters() UNIV_NOTHROW
 	{
-		return(TAS(&m_lock_word, MUTEX_STATE_WAITERS)
+		return(my_atomic_faslong(&m_lock_word, MUTEX_STATE_WAITERS)
 		       == MUTEX_STATE_UNLOCKED);
 	}
 
@@ -469,7 +469,7 @@ struct TTASMutex {
 	@return	true if lock succeeded */
 	bool tas_lock() UNIV_NOTHROW
 	{
-		return(TAS(&m_lock_word, MUTEX_STATE_LOCKED)
+		return(my_atomic_faslong(&m_lock_word, MUTEX_STATE_LOCKED)
 			== MUTEX_STATE_UNLOCKED);
 	}
 
@@ -484,7 +484,7 @@ struct TTASMutex {
 		lock_word_t	lock =
 #endif /* UNIV_DEBUG */
 
-		TAS(&m_lock_word, MUTEX_STATE_UNLOCKED);
+		my_atomic_storelong(&m_lock_word, MUTEX_STATE_UNLOCKED);
 
 		ut_ad(lock == MUTEX_STATE_LOCKED);
 	}
@@ -885,7 +885,7 @@ private:
 	@return	true if lock succeeded */
 	bool tas_lock() UNIV_NOTHROW
 	{
-		return(TAS(&m_lock_word, MUTEX_STATE_LOCKED)
+		return(my_atomic_faslong(&m_lock_word, MUTEX_STATE_LOCKED)
 			== MUTEX_STATE_UNLOCKED);
 	}
 
@@ -894,7 +894,7 @@ private:
 	that more conservative __sync_lock_test_and_set is used instead. */
 	void tas_unlock() UNIV_NOTHROW
 	{
-		TAS(&m_lock_word, MUTEX_STATE_UNLOCKED);
+		my_atomic_storelong(&m_lock_word, MUTEX_STATE_UNLOCKED);
 	}
 
 	/** Wakeup any waiting thread(s). */

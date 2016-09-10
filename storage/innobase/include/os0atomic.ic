@@ -87,19 +87,6 @@ win_cmp_and_xchg_dword(
 		(LONG) old_val));
 }
 
-/** Do an atomic test and set.
-@param[in,out]	ptr	Memory location to set
-@param[in]	new_val	new value
-@return	old value of memory location. */
-UNIV_INLINE
-lock_word_t
-os_atomic_test_and_set(
-	volatile lock_word_t*	ptr,
-	lock_word_t		new_val)
-{
-	return(InterlockedExchange(ptr, new_val));
-}
-
 /** Do an atomic compare and set
 @param[in,out]	ptr	Memory location to set
 @param[in]	old_val	old value to compare
@@ -119,30 +106,6 @@ os_atomic_val_compare_and_swap(
 }
 
 #elif defined(HAVE_IB_GCC_ATOMIC_COMPARE_EXCHANGE)
-
-/** Do an atomic test and set.
-@param[in,out]	ptr	Memory location to set
-@param[in]	new_val	new value
-@return	old value of memory location. */
-UNIV_INLINE
-lock_word_t
-os_atomic_test_and_set(
-	volatile lock_word_t*	ptr,
-	lock_word_t		new_val)
-{
-	lock_word_t	ret;
-
-	/* Silence a compiler warning about unused ptr. */
-	(void) ptr;
-
-#if defined(__powerpc__) || defined(__aarch64__)
-	__atomic_exchange(ptr, &new_val,  &ret, __ATOMIC_SEQ_CST);
-#else
-	__atomic_exchange(ptr, &new_val,  &ret, __ATOMIC_RELEASE);
-#endif
-
-	return(ret);
-}
 
 /** Do an atomic compare and set
 @param[in,out]	ptr	Memory location to set
@@ -171,19 +134,6 @@ os_atomic_val_compare_and_swap(
 }
 
 #elif defined(IB_STRONG_MEMORY_MODEL)
-
-/** Do an atomic test and set.
-@param[in,out]	ptr	Memory location to set
-@param[in]	new_val	new value
-@return	old value of memory location. */
-UNIV_INLINE
-lock_word_t
-os_atomic_test_and_set(
-	volatile lock_word_t*	ptr,
-	lock_word_t		new_val)
-{
-	return(__sync_lock_test_and_set(ptr, new_val));
-}
 
 /** Do an atomic compare and set
 @param[in,out]	ptr	Memory location to set

@@ -192,22 +192,6 @@ IF(NOT MSVC)
   HAVE_IB_GCC_ATOMIC_BUILTINS
   )
   CHECK_C_SOURCE(
-  "
-  int main()
-  {
-    long	res;
-    char	c;
-
-    c = 10;
-    res = __sync_lock_test_and_set(&c, 123);
-    if (res != 10 || c != 123) {
-      return(1);
-    }
-    return(0);
-  }"
-  HAVE_IB_GCC_ATOMIC_BUILTINS_BYTE
-  )
-  CHECK_C_SOURCE(
   "#include<stdint.h>
   int main()
   {
@@ -246,7 +230,6 @@ IF(NOT MSVC)
     unsigned char	b = 0;
     unsigned char	c = 1;
 
-    __atomic_exchange(&a, &b,  &c, __ATOMIC_RELEASE);
     __atomic_compare_exchange(&a, &b, &c, 0,
 			      __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
     return(0);
@@ -274,10 +257,6 @@ ENDIF()
 
 IF(HAVE_IB_GCC_ATOMIC_BUILTINS)
  ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_BUILTINS=1)
-ENDIF()
-
-IF(HAVE_IB_GCC_ATOMIC_BUILTINS_BYTE)
- ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_BUILTINS_BYTE=1)
 ENDIF()
 
 IF(HAVE_IB_GCC_SYNC_SYNCHRONISE)

@@ -60,17 +60,6 @@ typedef ulint	lock_word_t;
 /**********************************************************//**
 Atomic compare-and-swap and increment for InnoDB. */
 
-/** Do an atomic test and set.
-@param[in/out]	ptr	Memory location to set
-@param[in]	new_val	new value
-@return	old value of memory location. */
-UNIV_INLINE
-lock_word_t
-os_atomic_test_and_set(
-	volatile lock_word_t*	ptr,
-	lock_word_t		new_val);
-
-
 /** Do an atomic compare and set
 @param[in/out]	ptr	Memory location to set
 @param[in]	old_val	old value to compare
@@ -212,7 +201,6 @@ os_compare_and_swap_thread_id(volatile os_thread_id_t* ptr, os_thread_id_t old_v
 
 #endif
 
-#define TAS(l, n)			os_atomic_test_and_set((l), (n))
 #define CAS(l, o, n)		os_atomic_val_compare_and_swap((l), (o), (n))
 
 /** barrier definitions for memory ordering */
