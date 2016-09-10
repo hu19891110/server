@@ -28,6 +28,7 @@ Created 9/5/1995 Heikki Tuuri
 
 #include <vector>
 #include <iostream>
+#include <my_atomic.h>
 
 #include "ut0new.h"
 #include "ut0counter.h"
@@ -36,6 +37,15 @@ Created 9/5/1995 Heikki Tuuri
 /** Set when InnoDB has invoked exit(). */
 extern bool	innodb_calling_exit;
 #endif /* UNIV_DEBUG && !UNIV_INNOCHECKSUM */
+
+#ifdef _WIN32
+/** On Windows, InterlockedExchange operates on LONG variable */
+typedef LONG	lock_word_t;
+#elif defined(MUTEX_FUTEX)
+typedef int	lock_word_t;
+# else
+typedef ulint	lock_word_t;
+#endif /* _WIN32 */
 
 #ifdef _WIN32
 /** Native mutex */

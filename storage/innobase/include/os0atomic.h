@@ -33,24 +33,6 @@ Created 2012-09-23 Sunny Bains (Split from os0sync.h)
 #define os0atomic_h
 
 #include "univ.i"
-#include <my_atomic.h>
-
-# define INNODB_RW_LOCKS_USE_ATOMICS
-
-#ifdef _WIN32
-
-/** On Windows, InterlockedExchange operates on LONG variable */
-typedef LONG	lock_word_t;
-
-#elif defined(MUTEX_FUTEX)
-
-typedef int	lock_word_t;
-
-# else
-
-typedef ulint	lock_word_t;
-
-#endif /* _WIN32 */
 
 /** barrier definitions for memory ordering */
 #ifdef HAVE_IB_GCC_ATOMIC_THREAD_FENCE
