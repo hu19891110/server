@@ -342,19 +342,8 @@ rw_lock_set_writer_id_and_recursion_flag(
 	os_thread_id_t	curr_thread	= os_thread_get_curr_id();
 
 #ifdef INNODB_RW_LOCKS_USE_ATOMICS
-	os_thread_id_t	local_thread;
-	ibool		success;
 
-	/* Prevent Valgrind warnings about writer_thread being
-	uninitialized.  It does not matter if writer_thread is
-	uninitialized, because we are comparing writer_thread against
-	itself, and the operation should always succeed. */
-	UNIV_MEM_VALID(&lock->writer_thread, sizeof lock->writer_thread);
-
-	local_thread = lock->writer_thread;
-	success = os_compare_and_swap_thread_id(
-		&lock->writer_thread, local_thread, curr_thread);
-	ut_a(success);
+	my_atomic_storelong(&lock->writer_thread, curr_thread);
 	lock->recursive = recursive;
 
 #else /* INNODB_RW_LOCKS_USE_ATOMICS */

@@ -52,36 +52,6 @@ typedef ulint	lock_word_t;
 
 #endif /* _WIN32 */
 
-#ifdef _WIN32
-
-/**********************************************************//**
-Atomic compare and exchange of 32 bit unsigned integers.
-@return value found before the exchange.
-If it is not equal to old_value the exchange did not happen. */
-UNIV_INLINE
-DWORD
-win_cmp_and_xchg_dword(
-/*===================*/
-	volatile DWORD*	ptr,		/*!< in/out: source/destination */
-	DWORD		new_val,	/*!< in: exchange value */
-	DWORD		old_val);	/*!< in: value to compare to */
-
-/* windows thread objects can always be passed to windows atomic functions */
-# define os_compare_and_swap_thread_id(ptr, old_val, new_val) \
-	(win_cmp_and_xchg_dword(ptr, new_val, old_val) == old_val)
-
-#else
-/* Fall back to GCC-style atomic builtins. */
-
-UNIV_INLINE
-bool
-os_compare_and_swap_thread_id(volatile os_thread_id_t* ptr, os_thread_id_t old_val, os_thread_id_t new_val)
-{
-	return __sync_bool_compare_and_swap(ptr, old_val, new_val);
-}
-
-#endif
-
 /** barrier definitions for memory ordering */
 #ifdef HAVE_IB_GCC_ATOMIC_THREAD_FENCE
 # define HAVE_MEMORY_BARRIER
@@ -119,9 +89,5 @@ os_compare_and_swap_thread_id(volatile os_thread_id_t* ptr, os_thread_id_t old_v
 # define IB_MEMORY_BARRIER_STARTUP_MSG \
 	"Memory barrier is not used"
 #endif
-
-#ifndef UNIV_NONINL
-#include "os0atomic.ic"
-#endif /* UNIV_NOINL */
 
 #endif /* !os0atomic_h */
