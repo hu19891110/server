@@ -246,22 +246,12 @@ struct TTASFutexMutex {
 	/** Release the mutex. */
 	void exit() UNIV_NOTHROW
 	{
-		/* If there are threads waiting then we have to wake
-		them up. Reset the lock state to unlocked so that waiting
-		threads can test for success. */
-
-		os_rmb;
-
-		if (state() == MUTEX_STATE_WAITERS) {
-
-			m_lock_word = MUTEX_STATE_UNLOCKED;
-
-		} else if (unlock() == MUTEX_STATE_LOCKED) {
-			/* No threads waiting, no need to signal a wakeup. */
-			return;
-		}
-
-		signal();
+		if (my_atomic_fas32_explicit(&m_lock_word,
+					     MUTEX_STATE_UNLOCKED,
+					     MY_MEMORY_ORDER_RELEASE)
+		    == MUTEX_STATE_WAITERS)
+			syscall(SYS_futex, &m_lock_word, FUTEX_WAKE_PRIVATE,
+				1, 0, 0, 0);
 	}
 
 	/** Try and lock the mutex.
@@ -305,13 +295,6 @@ private:
 		return(m_lock_word);
 	}
 
-	/** Release the mutex.
-	@return the new state of the mutex */
-	int32 unlock() UNIV_NOTHROW
-	{
-		return(my_atomic_fas32(&m_lock_word, MUTEX_STATE_UNLOCKED));
-	}
-
 	/** Note that there are threads waiting and need to be woken up.
 	@return true if state was MUTEX_STATE_UNLOCKED (ie. granted) */
 	bool set_waiters() UNIV_NOTHROW
@@ -352,13 +335,6 @@ private:
 		} while (!set_waiters());
 
 		return(n_waits);
-	}
-
-	/** Wakeup a waiting thread */
-	void signal() UNIV_NOTHROW
-	{
-		syscall(SYS_futex, &m_lock_word, FUTEX_WAKE_PRIVATE,
-			MUTEX_STATE_LOCKED, 0, 0, 0);
 	}
 
 	/** Poll waiting for mutex to be unlocked.
