@@ -268,7 +268,11 @@ struct TTASFutexMutex {
 	@return true if successful */
 	bool try_lock() UNIV_NOTHROW
 	{
-		return(trylock() == MUTEX_STATE_UNLOCKED);
+		int32 oldval = MUTEX_STATE_UNLOCKED;
+		return(my_atomic_cas32_strong_explicit(&m_lock_word, &oldval,
+						       MUTEX_STATE_LOCKED,
+						       MY_MEMORY_ORDER_ACQUIRE,
+						       MY_MEMORY_ORDER_RELAXED));
 	}
 
 	/** @return true if mutex is unlocked */
