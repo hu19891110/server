@@ -215,29 +215,27 @@ struct TTASFutexMutex {
 		const char*	filename,
 		uint32_t	line) UNIV_NOTHROW
 	{
-		uint32_t	n_spins;
-		int32		lock = ttas(max_spins, max_delay, n_spins);
+		uint32_t n_spins, n_waits;
 
-		/* If there were no waiters when this thread tried
-		to acquire the mutex then set the waiters flag now.
-		Additionally, when this thread set the waiters flag it is
-		possible that the mutex had already been released
-		by then. In this case the thread can assume it
-		was granted the mutex. */
-
-		uint32_t	n_waits;
-
-		if (lock != MUTEX_STATE_UNLOCKED) {
-
-			if (lock != MUTEX_STATE_LOCKED || !set_waiters()) {
-
-				n_waits = wait();
-			} else {
-				n_waits = 0;
+		for (n_spins= 0; n_spins < max_spins; n_spins++) {
+			if (try_lock()) {
+				m_policy.add(n_spins, 0);
+				return;
 			}
 
-		} else {
-			n_waits = 0;
+			ut_delay(ut_rnd_interval(0, max_delay));
+		}
+
+		for (n_waits= 0;; n_waits++) {
+			if (my_atomic_fas32_explicit(&m_lock_word,
+						     MUTEX_STATE_WAITERS,
+						     MY_MEMORY_ORDER_ACQUIRE)
+			    == MUTEX_STATE_UNLOCKED)
+				break;
+
+			syscall(SYS_futex, &m_lock_word,
+				FUTEX_WAIT_PRIVATE, MUTEX_STATE_WAITERS,
+				0, 0, 0);
 		}
 
 		m_policy.add(n_spins, n_waits);
@@ -255,16 +253,6 @@ struct TTASFutexMutex {
 	}
 
 	/** Try and lock the mutex.
-	@return the old state of the mutex */
-	int32 trylock() UNIV_NOTHROW
-	{
-		int32 oldval = MUTEX_STATE_UNLOCKED;
-		my_atomic_cas32(&m_lock_word,
-				&oldval, MUTEX_STATE_LOCKED);
-		return(oldval);
-	}
-
-	/** Try and lock the mutex.
 	@return true if successful */
 	bool try_lock() UNIV_NOTHROW
 	{
@@ -273,12 +261,6 @@ struct TTASFutexMutex {
 						       MUTEX_STATE_LOCKED,
 						       MY_MEMORY_ORDER_ACQUIRE,
 						       MY_MEMORY_ORDER_RELAXED));
-	}
-
-	/** @return true if mutex is unlocked */
-	bool is_locked() const UNIV_NOTHROW
-	{
-		return(state() != MUTEX_STATE_UNLOCKED);
 	}
 
 	/** @return non-const version of the policy */
@@ -293,86 +275,6 @@ struct TTASFutexMutex {
 		return(m_policy);
 	}
 private:
-	/** @return the lock state. */
-	int32 state() const UNIV_NOTHROW
-	{
-		return(m_lock_word);
-	}
-
-	/** Note that there are threads waiting and need to be woken up.
-	@return true if state was MUTEX_STATE_UNLOCKED (ie. granted) */
-	bool set_waiters() UNIV_NOTHROW
-	{
-		return(my_atomic_fas32(&m_lock_word, MUTEX_STATE_WAITERS)
-		       == MUTEX_STATE_UNLOCKED);
-	}
-
-	/** Set the waiters flag, only if the mutex is locked
-	@return true if succesful. */
-	bool try_set_waiters() UNIV_NOTHROW
-	{
-		int32 oldval = MUTEX_STATE_LOCKED;
-		my_atomic_cas32(&m_lock_word,
-				&oldval, MUTEX_STATE_WAITERS);
-		return(oldval != MUTEX_STATE_UNLOCKED);
-	}
-
-	/** Wait if the lock is contended.
-	@return the number of waits */
-	uint32_t wait() UNIV_NOTHROW
-	{
-		uint32_t	n_waits = 0;
-
-		/* Use FUTEX_WAIT_PRIVATE because our mutexes are
-		not shared between processes. */
-
-		do {
-			++n_waits;
-
-			syscall(SYS_futex, &m_lock_word,
-				FUTEX_WAIT_PRIVATE, MUTEX_STATE_WAITERS,
-				0, 0, 0);
-
-			// Since we are retrying the operation the return
-			// value doesn't matter.
-
-		} while (!set_waiters());
-
-		return(n_waits);
-	}
-
-	/** Poll waiting for mutex to be unlocked.
-	@param[in]	max_spins	max spins
-	@param[in]	max_delay	max delay per spin
-	@param[out]	n_spins		retries before acquire
-	@return value of lock word before locking. */
-	int32 ttas(
-		uint32_t	max_spins,
-		uint32_t	max_delay,
-		uint32_t&	n_spins) UNIV_NOTHROW
-	{
-		os_rmb;
-
-		for (n_spins = 0; n_spins < max_spins; ++n_spins) {
-
-			if (!is_locked()) {
-
-				int32		lock = trylock();
-
-				if (lock == MUTEX_STATE_UNLOCKED) {
-					/* Lock successful */
-					return(lock);
-				}
-			}
-
-			ut_delay(ut_rnd_interval(0, max_delay));
-		}
-
-		return(trylock());
-	}
-
-private:
-
 	/** Policy data */
 	MutexPolicy		m_policy;
 
