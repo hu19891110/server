@@ -216,7 +216,7 @@ struct TTASFutexMutex {
 		uint32_t	line) UNIV_NOTHROW
 	{
 		uint32_t	n_spins;
-		lock_word_t	lock = ttas(max_spins, max_delay, n_spins);
+		int32		lock = ttas(max_spins, max_delay, n_spins);
 
 		/* If there were no waiters when this thread tried
 		to acquire the mutex then set the waiters flag now.
@@ -266,11 +266,11 @@ struct TTASFutexMutex {
 
 	/** Try and lock the mutex.
 	@return the old state of the mutex */
-	lock_word_t trylock() UNIV_NOTHROW
+	int32 trylock() UNIV_NOTHROW
 	{
-		lock_word_t oldval = MUTEX_STATE_UNLOCKED;
-		my_atomic_caslong(&m_lock_word,
-				  &oldval, MUTEX_STATE_LOCKED);
+		int32 oldval = MUTEX_STATE_UNLOCKED;
+		my_atomic_cas32(&m_lock_word,
+				&oldval, MUTEX_STATE_LOCKED);
 		return(oldval);
 	}
 
@@ -300,23 +300,23 @@ struct TTASFutexMutex {
 	}
 private:
 	/** @return the lock state. */
-	lock_word_t state() const UNIV_NOTHROW
+	int32 state() const UNIV_NOTHROW
 	{
 		return(m_lock_word);
 	}
 
 	/** Release the mutex.
 	@return the new state of the mutex */
-	lock_word_t unlock() UNIV_NOTHROW
+	int32 unlock() UNIV_NOTHROW
 	{
-		return(my_atomic_faslong(&m_lock_word, MUTEX_STATE_UNLOCKED));
+		return(my_atomic_fas32(&m_lock_word, MUTEX_STATE_UNLOCKED));
 	}
 
 	/** Note that there are threads waiting and need to be woken up.
 	@return true if state was MUTEX_STATE_UNLOCKED (ie. granted) */
 	bool set_waiters() UNIV_NOTHROW
 	{
-		return(my_atomic_faslong(&m_lock_word, MUTEX_STATE_WAITERS)
+		return(my_atomic_fas32(&m_lock_word, MUTEX_STATE_WAITERS)
 		       == MUTEX_STATE_UNLOCKED);
 	}
 
@@ -324,9 +324,9 @@ private:
 	@return true if succesful. */
 	bool try_set_waiters() UNIV_NOTHROW
 	{
-		lock_word_t oldval = MUTEX_STATE_LOCKED;
-		my_atomic_caslong(&m_lock_word,
-				  &oldval, MUTEX_STATE_WAITERS);
+		int32 oldval = MUTEX_STATE_LOCKED;
+		my_atomic_cas32(&m_lock_word,
+				&oldval, MUTEX_STATE_WAITERS);
 		return(oldval != MUTEX_STATE_UNLOCKED);
 	}
 
@@ -366,7 +366,7 @@ private:
 	@param[in]	max_delay	max delay per spin
 	@param[out]	n_spins		retries before acquire
 	@return value of lock word before locking. */
-	lock_word_t ttas(
+	int32 ttas(
 		uint32_t	max_spins,
 		uint32_t	max_delay,
 		uint32_t&	n_spins) UNIV_NOTHROW
@@ -377,7 +377,7 @@ private:
 
 			if (!is_locked()) {
 
-				lock_word_t	lock = trylock();
+				int32		lock = trylock();
 
 				if (lock == MUTEX_STATE_UNLOCKED) {
 					/* Lock successful */
@@ -398,7 +398,7 @@ private:
 
 	/** lock_word is the target of the atomic test-and-set instruction
 	when atomic operations are enabled. */
-	lock_word_t		m_lock_word MY_ALIGNED(MY_ALIGNOF(ulint));
+	int32			m_lock_word;
 };
 
 #endif /* HAVE_IB_LINUX_FUTEX */
