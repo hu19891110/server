@@ -67,8 +67,6 @@ struct OSTrackMutex {
 		m_mutex.init();
 
 		ut_d(m_freed = false);
-
-		m_policy.init(*this, id, filename, line);
 	}
 
 	/** Destroy the mutex */
@@ -80,8 +78,6 @@ struct OSTrackMutex {
 		m_mutex.destroy();
 
 		ut_d(m_freed = true);
-
-		m_policy.destroy();
 	}
 
 	/** Release the mutex. */
@@ -128,15 +124,6 @@ struct OSTrackMutex {
 
 		return(locked);
 	}
-
-#ifdef UNIV_DEBUG
-	/** @return true if the thread owns the mutex. */
-	bool is_owned() const
-		UNIV_NOTHROW
-	{
-		return(m_locked && m_policy.is_owned());
-	}
-#endif /* UNIV_DEBUG */
 
 	/** @return non-const version of the policy */
 	MutexPolicy& policy()
@@ -208,7 +195,6 @@ struct TTASFutexMutex {
 		UNIV_NOTHROW
 	{
 		ut_a(m_lock_word == MUTEX_STATE_UNLOCKED);
-		m_policy.init(*this, id, filename, line);
 	}
 
 	/** Destroy the mutex. */
@@ -216,7 +202,6 @@ struct TTASFutexMutex {
 	{
 		/* The destructor can be called at shutdown. */
 		ut_a(m_lock_word == MUTEX_STATE_UNLOCKED);
-		m_policy.destroy();
 	}
 
 	/** Acquire the mutex.
@@ -301,14 +286,6 @@ struct TTASFutexMutex {
 	{
 		return(state() != MUTEX_STATE_UNLOCKED);
 	}
-
-#ifdef UNIV_DEBUG
-	/** @return true if the thread owns the mutex. */
-	bool is_owned() const UNIV_NOTHROW
-	{
-		return(is_locked() && m_policy.is_owned());
-	}
-#endif /* UNIV_DEBUG */
 
 	/** @return non-const version of the policy */
 	MutexPolicy& policy() UNIV_NOTHROW
@@ -456,7 +433,6 @@ struct TTASMutex {
 		UNIV_NOTHROW
 	{
 		ut_ad(m_lock_word == MUTEX_STATE_UNLOCKED);
-		m_policy.init(*this, id, filename, line);
 	}
 
 	/** Destroy the mutex. */
@@ -464,7 +440,6 @@ struct TTASMutex {
 	{
 		/* The destructor can be called at shutdown. */
 		ut_ad(m_lock_word == MUTEX_STATE_UNLOCKED);
-		m_policy.destroy();
 	}
 
 	/**
@@ -536,14 +511,6 @@ struct TTASMutex {
 	{
 		return(m_lock_word != MUTEX_STATE_UNLOCKED);
 	}
-
-#ifdef UNIV_DEBUG
-	/** @return true if the calling thread owns the mutex. */
-	bool is_owned() const UNIV_NOTHROW
-	{
-		return(is_locked() && m_policy.is_owned());
-	}
-#endif /* UNIV_DEBUG */
 
 	/** @return non-const version of the policy */
 	MutexPolicy& policy() UNIV_NOTHROW
@@ -644,8 +611,6 @@ struct TTASEventMutex {
 		ut_a(m_lock_word == MUTEX_STATE_UNLOCKED);
 
 		m_event = os_event_create(sync_latch_get_name(id));
-
-		m_policy.init(*this, id, filename, line);
 	}
 
 	/** This is the real desctructor. This mutex can be created in BSS and
@@ -659,8 +624,6 @@ struct TTASEventMutex {
 		/* We have to free the event before InnoDB shuts down. */
 		os_event_destroy(m_event);
 		m_event = 0;
-
-		m_policy.destroy();
 	}
 
 	/** Try and lock the mutex. Note: POSIX returns 0 on success.
@@ -732,15 +695,6 @@ struct TTASEventMutex {
 	{
 		return(m_lock_word != MUTEX_STATE_UNLOCKED);
 	}
-
-#ifdef UNIV_DEBUG
-	/** @return true if the calling thread owns the mutex. */
-	bool is_owned() const
-		UNIV_NOTHROW
-	{
-		return(is_locked() && m_policy.is_owned());
-	}
-#endif /* UNIV_DEBUG */
 
 	/** @return non-const version of the policy */
 	MutexPolicy& policy()
@@ -1034,7 +988,7 @@ struct PolicyMutex
 	/** @return true if the thread owns the mutex. */
 	bool is_owned() const UNIV_NOTHROW
 	{
-		return(m_impl.is_owned());
+		return(policy().is_owned());
 	}
 #endif /* UNIV_DEBUG */
 
@@ -1055,6 +1009,7 @@ struct PolicyMutex
 #endif /* UNIV_PFS_MUTEX */
 
 		m_impl.init(id, filename, line);
+		policy().init(m_impl, id, filename, line);
 	}
 
 	/** Free resources (if any) */
@@ -1064,6 +1019,7 @@ struct PolicyMutex
 		pfs_del();
 #endif /* UNIV_PFS_MUTEX */
 		m_impl.destroy();
+		policy().destroy();
 	}
 
 	/** Required for os_event_t */
