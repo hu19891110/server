@@ -93,7 +93,6 @@ rw_lock_set_waiter_flag(
 	(void) my_atomic_caslong(&lock->waiters, &oldval, 1);
 #else /* INNODB_RW_LOCKS_USE_ATOMICS */
 	lock->waiters = 1;
-	os_wmb;
 #endif /* INNODB_RW_LOCKS_USE_ATOMICS */
 }
 
@@ -112,7 +111,6 @@ rw_lock_reset_waiter_flag(
 	(void) my_atomic_caslong(&lock->waiters, &oldval, 0);
 #else /* INNODB_RW_LOCKS_USE_ATOMICS */
 	lock->waiters = 0;
-	os_wmb;
 #endif /* INNODB_RW_LOCKS_USE_ATOMICS */
 }
 
