@@ -31,6 +31,7 @@ Created 2013-03-26 Sunny Bains.
 #include "ut0ut.h"
 #include "ut0rnd.h"
 #include "os0event.h"
+#include "sync0arr.h"
 
 /** OS mutex for tracking lock/unlock for debugging */
 template <template <typename> class Policy = NoPolicy>
@@ -404,7 +405,6 @@ struct TTASEventMutex {
 		UNIV_NOTHROW
 		:
 		m_lock_word(MUTEX_STATE_UNLOCKED),
-		m_waiters(),
 		m_event()
 	{
 		/* Check that lock_word is aligned. */
@@ -452,29 +452,24 @@ struct TTASEventMutex {
 	bool try_lock()
 		UNIV_NOTHROW
 	{
-		return(tas_lock());
+		int32 oldval = MUTEX_STATE_UNLOCKED;
+		return(my_atomic_cas32_strong_explicit(&m_lock_word, &oldval,
+						       MUTEX_STATE_LOCKED,
+						       MY_MEMORY_ORDER_ACQUIRE,
+						       MY_MEMORY_ORDER_RELAXED));
 	}
 
 	/** Release the mutex. */
 	void exit()
 		UNIV_NOTHROW
 	{
-		/* A problem: we assume that mutex_reset_lock word
-		is a memory barrier, that is when we read the waiters
-		field next, the read must be serialized in memory
-		after the reset. A speculative processor might
-		perform the read first, which could leave a waiting
-		thread hanging indefinitely.
-
-		Our current solution call every second
-		sync_arr_wake_threads_if_sema_free()
-		to wake up possible hanging threads if they are missed
-		in mutex_signal_object. */
-
-		tas_unlock();
-
-		if (m_waiters != 0) {
-			signal();
+		if (my_atomic_fas32_explicit(&m_lock_word,
+					     MUTEX_STATE_UNLOCKED,
+					     MY_MEMORY_ORDER_RELEASE)
+		    == MUTEX_STATE_WAITERS)
+		{
+			os_event_set(m_event);
+			sync_array_object_signalled();
 		}
 	}
 
@@ -490,13 +485,45 @@ struct TTASEventMutex {
 		uint32_t	line)
 		UNIV_NOTHROW
 	{
-		if (!try_lock()) {
-			spin_and_try_lock(max_spins, max_delay, filename, line);
+		uint32_t	n_spins = 0;
+		uint32_t	n_waits = 0;
+		const uint32_t	step = max_spins;
+
+		while (!try_lock()) {
+			if (n_spins++ == max_spins) {
+				max_spins += step;
+				n_waits++;
+				os_thread_yield();
+
+				sync_cell_t*	cell;
+				sync_array_t *sync_arr = sync_array_get_and_reserve_cell(
+					this,
+					(m_policy.get_id() == LATCH_ID_BUF_BLOCK_MUTEX
+					 || m_policy.get_id() == LATCH_ID_BUF_POOL_ZIP)
+					? SYNC_BUF_BLOCK
+					: SYNC_MUTEX,
+					filename, line, &cell);
+
+				int32 oldval = MUTEX_STATE_LOCKED;
+				my_atomic_cas32_strong_explicit(&m_lock_word, &oldval,
+								MUTEX_STATE_WAITERS,
+								MY_MEMORY_ORDER_RELAXED,
+								MY_MEMORY_ORDER_RELAXED);
+
+				if (oldval == MUTEX_STATE_UNLOCKED)
+					sync_array_free_cell(sync_arr, cell);
+				else
+					sync_array_wait_event(sync_arr, cell);
+			}
+			else
+				ut_delay(ut_rnd_interval(0, max_delay));
 		}
+
+		m_policy.add(n_spins, n_waits);
 	}
 
 	/** @return the lock state. */
-	lock_word_t state() const
+	int32 state() const
 		UNIV_NOTHROW
 	{
 		return(m_lock_word);
@@ -508,13 +535,6 @@ struct TTASEventMutex {
 		UNIV_NOTHROW
 	{
 		return(m_event);
-	}
-
-	/** @return true if locked by some thread */
-	bool is_locked() const
-		UNIV_NOTHROW
-	{
-		return(m_lock_word != MUTEX_STATE_UNLOCKED);
 	}
 
 	/** @return non-const version of the policy */
@@ -532,164 +552,13 @@ struct TTASEventMutex {
 	}
 
 private:
-	/** Wait in the sync array.
-	@param[in]	filename	from where it was called
-	@param[in]	line		line number in file
-	@param[in]	spin		retry this many times again
-	@return true if the mutex acquisition was successful. */
-	bool wait(
-		const char*	filename,
-		uint32_t	line,
-		uint32_t	spin)
-		UNIV_NOTHROW;
-
-	/** Spin and wait for the mutex to become free.
-	@param[in]	max_spins	max spins
-	@param[in]	max_delay	max delay per spin
-	@param[in,out]	n_spins		spin start index
-	@return true if unlocked */
-	bool is_free(
-		uint32_t	max_spins,
-		uint32_t	max_delay,
-		uint32_t&	n_spins) const
-		UNIV_NOTHROW
-	{
-		ut_ad(n_spins <= max_spins);
-
-		/* Spin waiting for the lock word to become zero. Note
-		that we do not have to assume that the read access to
-		the lock word is atomic, as the actual locking is always
-		committed with atomic test-and-set. In reality, however,
-		all processors probably have an atomic read of a memory word. */
-
-		do {
-			if (!is_locked()) {
-				return(true);
-			}
-
-			ut_delay(ut_rnd_interval(0, max_delay));
-
-			++n_spins;
-
-		} while (n_spins < max_spins);
-
-		return(false);
-	}
-
-	/** Spin while trying to acquire the mutex
-	@param[in]	max_spins	max number of spins
-	@param[in]	max_delay	max delay per spin
-	@param[in]	filename	from where called
-	@param[in]	line		within filename */
-	void spin_and_try_lock(
-		uint32_t	max_spins,
-		uint32_t	max_delay,
-		const char*	filename,
-		uint32_t	line)
-		UNIV_NOTHROW
-	{
-		uint32_t	n_spins = 0;
-		uint32_t	n_waits = 0;
-		const uint32_t	step = max_spins;
-
-		os_rmb;
-
-		for (;;) {
-
-			/* If the lock was free then try and acquire it. */
-
-			if (is_free(max_spins, max_delay, n_spins)) {
-
-				if (try_lock()) {
-
-					break;
-				} else {
-
-					continue;
-				}
-
-			} else {
-				max_spins = n_spins + step;
-			}
-
-			++n_waits;
-
-			os_thread_yield();
-
-			/* The 4 below is a heuristic that has existed for a
-			very long time now. It is unclear if changing this
-			value will make a difference.
-
-			NOTE: There is a delay that happens before the retry,
-			finding a free slot in the sync arary and the yield
-			above. Otherwise we could have simply done the extra
-			spin above. */
-
-			if (wait(filename, line, 4)) {
-
-				n_spins += 4;
-
-				break;
-			}
-		}
-
-		/* Waits and yields will be the same number in our
-		mutex design */
-
-		m_policy.add(n_spins, n_waits);
-	}
-
-	/** @return the value of the m_waiters flag */
-	lock_word_t waiters() UNIV_NOTHROW
-	{
-		return(m_waiters);
-	}
-
-	/** Note that there are threads waiting on the mutex */
-	void set_waiters() UNIV_NOTHROW
-	{
-		m_waiters = 1;
-		os_wmb;
-	}
-
-	/** Note that there are no threads waiting on the mutex */
-	void clear_waiters() UNIV_NOTHROW
-	{
-		m_waiters = 0;
-		os_wmb;
-	}
-
-	/** Try and acquire the lock using TestAndSet.
-	@return	true if lock succeeded */
-	bool tas_lock() UNIV_NOTHROW
-	{
-		return(my_atomic_faslong(&m_lock_word, MUTEX_STATE_LOCKED)
-			== MUTEX_STATE_UNLOCKED);
-	}
-
-	/** In theory __sync_lock_release should be used to release the lock.
-	Unfortunately, it does not work properly alone. The workaround is
-	that more conservative __sync_lock_test_and_set is used instead. */
-	void tas_unlock() UNIV_NOTHROW
-	{
-		my_atomic_storelong(&m_lock_word, MUTEX_STATE_UNLOCKED);
-	}
-
-	/** Wakeup any waiting thread(s). */
-	void signal() UNIV_NOTHROW;
-
-private:
 	/** Disable copying */
 	TTASEventMutex(const TTASEventMutex&);
 	TTASEventMutex& operator=(const TTASEventMutex&);
 
 	/** lock_word is the target of the atomic test-and-set instruction
 	when atomic operations are enabled. */
-	lock_word_t		m_lock_word;
-
-	/** Set to 0 or 1. 1 if there are (or may be) threads waiting
-	in the global wait array for this mutex to be released. */
-	lock_word_t		m_waiters;
+	int32			m_lock_word;
 
 	/** Used by sync0arr.cc for the wait queue */
 	os_event_t		m_event;
