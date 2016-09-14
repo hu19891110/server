@@ -324,42 +324,23 @@ struct TTASMutex {
 		ut_ad(m_lock_word == MUTEX_STATE_UNLOCKED);
 	}
 
-	/**
-	Try and acquire the lock using TestAndSet.
-	@return	true if lock succeeded */
-	bool tas_lock() UNIV_NOTHROW
-	{
-		return(my_atomic_faslong(&m_lock_word, MUTEX_STATE_LOCKED)
-			== MUTEX_STATE_UNLOCKED);
-	}
-
-	/** In theory __sync_lock_release should be used to release the lock.
-	Unfortunately, it does not work properly alone. The workaround is
-	that more conservative __sync_lock_test_and_set is used instead. */
-	void tas_unlock() UNIV_NOTHROW
-	{
-#ifdef UNIV_DEBUG
-		ut_ad(state() == MUTEX_STATE_LOCKED);
-
-		lock_word_t	lock =
-#endif /* UNIV_DEBUG */
-
-		my_atomic_storelong(&m_lock_word, MUTEX_STATE_UNLOCKED);
-
-		ut_ad(lock == MUTEX_STATE_LOCKED);
-	}
-
 	/** Try and lock the mutex.
 	@return true on success */
 	bool try_lock() UNIV_NOTHROW
 	{
-		return(tas_lock());
+		int32 oldval = MUTEX_STATE_UNLOCKED;
+		return(my_atomic_cas32_strong_explicit(&m_lock_word, &oldval,
+						       MUTEX_STATE_LOCKED,
+						       MY_MEMORY_ORDER_ACQUIRE,
+						       MY_MEMORY_ORDER_RELAXED));
 	}
 
 	/** Release the mutex. */
 	void exit() UNIV_NOTHROW
 	{
-		tas_unlock();
+		ut_ad(m_lock_word == MUTEX_STATE_LOCKED);
+		my_atomic_store32_explicit(&m_lock_word, MUTEX_STATE_UNLOCKED,
+					   MY_MEMORY_ORDER_RELEASE);
 	}
 
 	/** Acquire the mutex.
@@ -373,25 +354,20 @@ struct TTASMutex {
 		const char*	filename,
 		uint32_t	line) UNIV_NOTHROW
 	{
-		if (!try_lock()) {
+		const uint32_t	step = max_spins;
+		uint32_t n_spins = 0;
 
-			uint32_t	n_spins = ttas(max_spins, max_delay);
-
-			/* No OS waits for spin mutexes */
-			m_policy.add(n_spins, 0);
+		while (!try_lock())
+		{
+			ut_delay(ut_rnd_interval(0, max_delay));
+			if (++n_spins == max_spins)
+			{
+				os_thread_yield();
+				max_spins+= step;
+			}
 		}
-	}
 
-	/** @return the lock state. */
-	lock_word_t state() const UNIV_NOTHROW
-	{
-		return(m_lock_word);
-	}
-
-	/** @return true if locked by some thread */
-	bool is_locked() const UNIV_NOTHROW
-	{
-		return(m_lock_word != MUTEX_STATE_UNLOCKED);
+		m_policy.add(n_spins, 0);
 	}
 
 	/** @return non-const version of the policy */
@@ -407,43 +383,6 @@ struct TTASMutex {
 	}
 
 private:
-	/** Spin and try to acquire the lock.
-	@param[in]	max_spins	max spins
-	@param[in]	max_delay	max delay per spin
-	@return number spins before acquire */
-	uint32_t ttas(
-		uint32_t	max_spins,
-		uint32_t	max_delay)
-		UNIV_NOTHROW
-	{
-		uint32_t	i = 0;
-		const uint32_t	step = max_spins;
-
-		os_rmb;
-
-		do {
-			while (is_locked()) {
-
-				ut_delay(ut_rnd_interval(0, max_delay));
-
-				++i;
-
-				if (i >= max_spins) {
-
-					max_spins += step;
-
-					os_thread_yield();
-
-					break;
-				}
-			}
-
-		} while (!try_lock());
-
-		return(i);
-	}
-
-private:
 	// Disable copying
 	TTASMutex(const TTASMutex&);
 	TTASMutex& operator=(const TTASMutex&);
@@ -453,7 +392,7 @@ private:
 
 	/** lock_word is the target of the atomic test-and-set instruction
 	when atomic operations are enabled. */
-	lock_word_t		m_lock_word;
+	int32			m_lock_word;
 };
 
 template <template <typename> class Policy = NoPolicy>
