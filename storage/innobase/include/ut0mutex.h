@@ -32,7 +32,6 @@ extern ulong	srv_spin_wait_delay;
 extern ulong	srv_n_spin_wait_rounds;
 extern ulong	srv_force_recovery_crash;
 
-#include "os0atomic.h"
 #include "sync0policy.h"
 #include "ib0mutex.h"
 #include <set>

@@ -164,33 +164,6 @@ IF(NOT MSVC)
     SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=i686")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686")
   ENDIF()
-  CHECK_C_SOURCE(
-  "#include<stdint.h>
-  int main()
-  {
-    __sync_synchronize();
-    return(0);
-  }"
-  HAVE_IB_GCC_SYNC_SYNCHRONISE
-  )
-  CHECK_C_SOURCE(
-  "#include<stdint.h>
-  int main()
-  {
-    __atomic_thread_fence(__ATOMIC_ACQUIRE);
-    __atomic_thread_fence(__ATOMIC_RELEASE);
-    return(0);
-  }"
-  HAVE_IB_GCC_ATOMIC_THREAD_FENCE
-  )
-
-IF(HAVE_IB_GCC_SYNC_SYNCHRONISE)
- ADD_DEFINITIONS(-DHAVE_IB_GCC_SYNC_SYNCHRONISE=1)
-ENDIF()
-
-IF(HAVE_IB_GCC_ATOMIC_THREAD_FENCE)
- ADD_DEFINITIONS(-DHAVE_IB_GCC_ATOMIC_THREAD_FENCE=1)
-ENDIF()
 
 # Only use futexes on Linux if GCC atomics are available
 IF(NOT MSVC AND NOT CMAKE_CROSSCOMPILING)
@@ -241,23 +214,6 @@ IF(HAVE_C99_INITIALIZERS)
   ADD_DEFINITIONS(-DHAVE_C99_INITIALIZERS)
 ENDIF()
 
-# Solaris atomics
-IF(CMAKE_SYSTEM_NAME STREQUAL "SunOS")
-  CHECK_C_SOURCE_COMPILES(
-  "#include <mbarrier.h>
-  int main() {
-    __machine_r_barrier();
-    __machine_w_barrier();
-    return(0);
-  }"
-  HAVE_IB_MACHINE_BARRIER_SOLARIS)
-
-  IF(HAVE_IB_MACHINE_BARRIER_SOLARIS)
-    ADD_DEFINITIONS(-DHAVE_IB_MACHINE_BARRIER_SOLARIS=1)
-  ENDIF()
-ENDIF()
-
-
 IF(UNIX)
 # this is needed to know which one of atomic_cas_32() or atomic_cas_64()
 # to use in the source
@@ -268,11 +224,6 @@ ENDIF()
 
 IF(SIZEOF_PTHREAD_T)
   ADD_DEFINITIONS(-DSIZEOF_PTHREAD_T=${SIZEOF_PTHREAD_T})
-ENDIF()
-
-IF(MSVC)
-  ADD_DEFINITIONS(-DHAVE_WINDOWS_ATOMICS)
-  ADD_DEFINITIONS(-DHAVE_WINDOWS_MM_FENCE)
 ENDIF()
 
 SET(MUTEXTYPE "event" CACHE STRING "Mutex type: event, sys or futex")

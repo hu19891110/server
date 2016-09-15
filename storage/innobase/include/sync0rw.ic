@@ -272,7 +272,6 @@ rw_lock_lock_word_decr(
 #ifdef INNODB_RW_LOCKS_USE_ATOMICS
 	lint local_lock_word;
 
-	os_rmb;
 	local_lock_word = lock->lock_word;
 	while (local_lock_word > threshold) {
 		if (my_atomic_caslong(&lock->lock_word,
