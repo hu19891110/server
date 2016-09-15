@@ -134,7 +134,7 @@ struct Block {
 	byte*		m_ptr;
 
 	byte		pad[CACHE_LINE_SIZE - sizeof(ulint)];
-	lock_word_t	m_in_use;
+	int32		m_in_use;
 };
 
 /** For storing the allocated blocks */
@@ -915,7 +915,8 @@ os_alloc_block()
 
 		pos = i++ % size;
 
-		if (my_atomic_faslong(&blocks[pos].m_in_use, 1) == 0) {
+		if (my_atomic_fas32_explicit(&blocks[pos].m_in_use, 1,
+					     MY_MEMORY_ORDER_ACQUIRE) == 0) {
 			block = &blocks[pos];
 			break;
 		}
@@ -938,7 +939,7 @@ os_free_block(Block* block)
 {
 	ut_ad(block->m_in_use == 1);
 
-	my_atomic_storelong(&block->m_in_use, 0);
+	my_atomic_store32_explicit(&block->m_in_use, 0, MY_MEMORY_ORDER_RELEASE);
 
 	/* When this block is not in the block cache, and it's
 	a temporary block, we need to free it directly. */

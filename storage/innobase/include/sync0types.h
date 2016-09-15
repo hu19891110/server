@@ -39,27 +39,12 @@ extern bool	innodb_calling_exit;
 #endif /* UNIV_DEBUG && !UNIV_INNOCHECKSUM */
 
 #ifdef _WIN32
-/** On Windows, InterlockedExchange operates on LONG variable */
-typedef LONG	lock_word_t;
-#elif defined(MUTEX_FUTEX)
-typedef int	lock_word_t;
-# else
-typedef ulint	lock_word_t;
-#endif /* _WIN32 */
-
-#ifdef _WIN32
 /** Native mutex */
 typedef CRITICAL_SECTION	sys_mutex_t;
 #else
 /** Native mutex */
 typedef pthread_mutex_t		sys_mutex_t;
 #endif /* _WIN32 */
-
-/** The new (C++11) syntax allows the following and we should use it when it
-is available on platforms that we support.
-
-	enum class mutex_state_t : lock_word_t { ... };
-*/
 
 /** Mutex states. */
 enum mutex_state_t {
