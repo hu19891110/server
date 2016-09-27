@@ -24,6 +24,7 @@
 
 #include <my_global.h>
 #include "sql_priv.h"
+#include <sql_class.h>
 #include "filesort.h"
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>			/* for macro offsetof */

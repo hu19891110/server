@@ -995,6 +995,7 @@ Virtual_column_info *add_virtual_expression(THD *thd, const char *txt,
   class Window_frame *window_frame;
   class Window_frame_bound *window_frame_bound;
   udf_func *udf;
+  st_trg_execution_order trg_execution_order;
 
   /* enums */
   enum Condition_information_item::Name cond_info_item_name;
@@ -1022,6 +1023,7 @@ Virtual_column_info *add_virtual_expression(THD *thd, const char *txt,
   enum Window_frame_bound::Bound_precedence_type bound_precedence_type;
   enum Window_frame::Frame_units frame_units;
   enum Window_frame::Frame_exclusion frame_exclusion;
+  enum trigger_order_type trigger_action_order_type;
   DDL_options_st object_ddl_options;
 }
 
@@ -1250,6 +1252,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  FLOAT_NUM
 %token  FLOAT_SYM                     /* SQL-2003-R */
 %token  FLUSH_SYM
+%token  FOLLOWS_SYM                   /* MYSQL trigger*/
 %token  FOLLOWING_SYM
 %token  FORCE_SYM
 %token  FOREIGN                       /* SQL-2003-R */
@@ -1472,6 +1475,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  POLYGON
 %token  PORT_SYM
 %token  POSITION_SYM                  /* SQL-2003-N */
+%token  PRECEDES_SYM                  /* MYSQL */
 %token  PRECEDING_SYM
 %token  PRECISION                     /* SQL-2003-R */
 %token  PREPARE_SYM                   /* SQL-2003-R */
@@ -2025,6 +2029,9 @@ END_OF_INPUT
 
 %type <NONE> signal_stmt resignal_stmt
 %type <diag_condition_item_name> signal_condition_information_item_name
+
+%type <trg_execution_order> trigger_follows_precedes_clause;
+%type <trigger_action_order_type> trigger_action_order;
 
 %type <diag_area> which_area;
 %type <diag_info> diagnostics_information;
@@ -14451,6 +14458,7 @@ keyword:
         | EXAMINED_SYM          {}
         | EXECUTE_SYM           {}
         | FLUSH_SYM             {}
+        | FOLLOWS_SYM           {}
         | FORMAT_SYM            {}
         | GET_SYM               {}
         | HANDLER_SYM           {}
@@ -14465,6 +14473,7 @@ keyword:
         | OWNER_SYM             {}
         | PARSER_SYM            {}
         | PORT_SYM              {}
+        | PRECEDES_SYM          {}
         | PREPARE_SYM           {}
         | REMOVE_SYM            {}
         | REPAIR                {}
@@ -16422,10 +16431,12 @@ view_select:
           {
             LEX *lex= Lex;
             uint len= YYLIP->get_cpp_ptr() - lex->create_view_select.str;
+            uint not_used;
             void *create_view_select= thd->memdup(lex->create_view_select.str, len);
             lex->create_view_select.length= len;
             lex->create_view_select.str= (char *) create_view_select;
-            trim_whitespace(thd->charset(), &lex->create_view_select);
+            trim_whitespace(thd->charset(), &lex->create_view_select,
+                            &not_used);
             lex->parsing_options.allows_variable= TRUE;
             lex->current_select->set_with_clause($2);
           }
@@ -16459,6 +16470,28 @@ view_check_option:
 
 **************************************************************************/
 
+trigger_action_order:
+            FOLLOWS_SYM
+            { $$= TRG_ORDER_FOLLOWS; }
+          | PRECEDES_SYM
+            { $$= TRG_ORDER_PRECEDES; }
+          ;
+
+trigger_follows_precedes_clause:
+            /* empty */
+            {
+              $$.ordering_clause= TRG_ORDER_NONE;
+              $$.anchor_trigger_name.str= NULL;
+              $$.anchor_trigger_name.length= 0;
+            }
+          |
+            trigger_action_order ident_or_text
+            {
+              $$.ordering_clause= $1;
+              $$.anchor_trigger_name= $2;
+            }
+          ;
+
 trigger_tail:
           TRIGGER_SYM
           remember_name
@@ -16483,7 +16516,11 @@ trigger_tail:
           }
           EACH_SYM
           ROW_SYM
-          { /* $17 */
+          {
+            Lex->trg_chistics.ordering_clause_begin= YYLIP->get_cpp_ptr();
+          }
+          trigger_follows_precedes_clause /* $18 */
+          { /* $19 */
             LEX *lex= thd->lex;
             Lex_input_stream *lip= YYLIP;
 
@@ -16494,14 +16531,16 @@ trigger_tail:
             lex->ident.str= $9;
             lex->ident.length= $13 - $9;
             lex->spname= $5;
+            (*static_cast<st_trg_execution_order*>(&lex->trg_chistics))= ($18);
+            lex->trg_chistics.ordering_clause_end= lip->get_cpp_ptr();
 
             if (!make_sp_head(thd, $5, TYPE_ENUM_TRIGGER))
               MYSQL_YYABORT;
 
-            lex->sphead->set_body_start(thd, lip->get_cpp_ptr());
+            lex->sphead->set_body_start(thd, lip->get_cpp_tok_start());
           }
-          sp_proc_stmt /* $18 */
-          { /* $19 */
+          sp_proc_stmt /* $20 */
+          { /* $21 */
             LEX *lex= Lex;
             sp_head *sp= lex->sphead;
 
