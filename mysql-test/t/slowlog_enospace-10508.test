@@ -4,7 +4,7 @@
 --source include/have_sequence.inc
 --source include/have_debug.inc
 
-call mtr.add_suppression('Error writing file.*errno: 1 "Operation not permitted');
+call mtr.add_suppression('Error writing file.*errno: 28 ');
 create table t1 (a int, b int) engine=memory;
 insert t1 select seq, seq+1 from seq_1_to_1000;
 set global general_log=0;
